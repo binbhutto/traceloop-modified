@@ -225,7 +225,7 @@ func (t *tracelooper) attach(mntnsID uint64) error {
 	}
 
 	// 2. Use this inner Map to create the perf reader.
-	perfReader, err := api.NewPerfReader(innerBuffer, 64*linuxPageSize, true)
+	perfReader, err := api.NewPerfReader(innerBuffer, 1024*linuxPageSize, true)
 	if err != nil {
 		innerBuffer.Close()
 
@@ -1001,4 +1001,6 @@ func gadgetStop() int32 {
 	return 0
 }
 
-func main() {}
+func main() {
+	println("Custom build")
+}

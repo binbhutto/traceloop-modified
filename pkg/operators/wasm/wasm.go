@@ -233,7 +233,7 @@ func (i *wasmOperatorInstance) init(
 	ctx := gadgetCtx.Context()
 	rtConfig := wazero.NewRuntimeConfig().
 		WithCloseOnContextDone(true).
-		WithMemoryLimitPages(256). // 16MB (64KB per page)
+		WithMemoryLimitPages(4096). // 16MB (64KB per page)
 		WithCompilationCache(cache)
 	i.rt = wazero.NewRuntimeWithConfig(ctx, rtConfig)
 
@@ -360,7 +360,7 @@ func (i *wasmOperatorInstance) Stop(gadgetCtx operators.GadgetContext) error {
 	}()
 
 	// We need a new context in here, as gadgetCtx has already been cancelled
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*42)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*120)
 	defer cancel()
 
 	return i.callGuestFunction(ctx, "gadgetStop")
