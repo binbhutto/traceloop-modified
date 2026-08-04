@@ -233,7 +233,7 @@ func (i *wasmOperatorInstance) init(
 	ctx := gadgetCtx.Context()
 	rtConfig := wazero.NewRuntimeConfig().
 		WithCloseOnContextDone(true).
-		WithMemoryLimitPages(4096). // 16MB (64KB per page)
+		WithMemoryLimitPages(16384). // 1GiB (64KiB per page; upstream default 256 = 16MiB)
 		WithCompilationCache(cache)
 	i.rt = wazero.NewRuntimeWithConfig(ctx, rtConfig)
 
@@ -270,7 +270,12 @@ func (i *wasmOperatorInstance) init(
 		return fmt.Errorf("reading wasm program: %w", err)
 	}
 
-	config := wazero.NewModuleConfig().WithStartFunctions("_initialize")
+	// DEBUG (Paper II): wazero discards guest stdout/stderr by default, which hides
+	// the Go runtime's fatal message behind a bare "wasm error: unreachable".
+	// Surface both so aborts inside gadgetStop are diagnosable.
+	config := wazero.NewModuleConfig().WithStartFunctions("_initialize").
+		WithStdout(os.Stderr).
+		WithStderr(os.Stderr)
 	mod, err := i.rt.InstantiateWithConfig(ctx, wasmProgram, config)
 	if err != nil {
 		return fmt.Errorf("instantiating wasm: %w", err)
@@ -317,7 +322,14 @@ func (i *wasmOperatorInstance) callGuestFunction(ctx context.Context, name strin
 	if fn == nil {
 		return nil
 	}
+	// DEBUG (Paper II): serialize all host->guest entries on the same lock as
+	// dataSourceCallback (datasource.go). Go-wasm guests are single-threaded;
+	// concurrent entry from two host goroutines corrupts the guest heap
+	// (investigating IG #4751). Note: would deadlock if a guest callback could
+	// fire synchronously inside a guest call — not the case for traceloop.
+	i.dataSourceCallbackLock.Lock()
 	ret, err := fn.Call(ctx)
+	i.dataSourceCallbackLock.Unlock()
 	if err != nil {
 		return fmt.Errorf("calling %s: %w", name, err)
 	}

@@ -1,6 +1,8 @@
 # Dockerfile for Inspektor Gadget.
 
-ARG BUILDER_IMAGE=golang:1.24.6-bullseye@sha256:75fd40c4f96cdec80e57a948b95ce06fb77531e776c4e338472315497f7847e8
+# DEBUG (Paper II): bumped from golang:1.24.6-bullseye (digest-pinned) so the
+# host build accepts go.mod's go>=1.25 requirement after the wazero v1.12 bump.
+ARG BUILDER_IMAGE=golang:1.26-bookworm
 ARG BASE_IMAGE=gcr.io/distroless/static-debian12@sha256:ce46866b3a5170db3b49364900fb3168dc0833dfb46c26da5c77f22abb01d8c3
 
 # Prepare and build gadget artifacts in a container
