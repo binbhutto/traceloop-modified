@@ -43,3 +43,13 @@ params:
       defaultValue: ""
       description: "Filter out by syscall names. Join multiple names with ','"
       title: Syscallfilters
+    perf-buffer-pages:
+      key: perf-buffer-pages
+      defaultValue: "1024"
+      description: "Size (in 4KiB pages) of the per-CPU, per-container overwritable ring buffer used to record syscalls. Memory usage scales as pages * 4096 * numCPUs * numContainers, so raise with care."
+      title: Perf buffer pages
+    memory-limit-pages:
+      key: memory-limit-pages
+      defaultValue: "16384"
+      description: "Size (in 64KiB pages) of the wasm guest's linear memory (heap), used while decoding/formatting buffered syscalls at gadgetStop. Raise if you increase perf-buffer-pages and see wasm OOM/'unreachable' traps."
+      title: Memory limit pages

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -55,6 +56,11 @@ const (
 
 	// cache path for the wasm compilation
 	cacheDir = "/var/run/ig/wasm-cache"
+
+	// default wazero linear memory limit (in 64KiB pages), used if the
+	// memory-limit-pages param is empty or invalid.
+	// 16384 pages = 1GiB (64KiB per page; upstream default 256 = 16MiB)
+	defaultMemoryLimitPages uint32 = 16384
 )
 
 type wasmOperator struct {
@@ -231,9 +237,19 @@ func (i *wasmOperatorInstance) init(
 	cache wazero.CompilationCache,
 ) error {
 	ctx := gadgetCtx.Context()
+
+	memoryLimitPages := defaultMemoryLimitPages
+	if raw, ok := i.paramValues["memory-limit-pages"]; ok && raw != "" {
+		parsed, err := strconv.ParseUint(raw, 10, 32)
+		if err != nil || parsed == 0 {
+			return fmt.Errorf("invalid memory-limit-pages %q: must be a positive integer", raw)
+		}
+		memoryLimitPages = uint32(parsed)
+	}
+
 	rtConfig := wazero.NewRuntimeConfig().
 		WithCloseOnContextDone(true).
-		WithMemoryLimitPages(16384). // 1GiB (64KiB per page; upstream default 256 = 16MiB)
+		WithMemoryLimitPages(memoryLimitPages).
 		WithCompilationCache(cache)
 	i.rt = wazero.NewRuntimeWithConfig(ctx, rtConfig)
 

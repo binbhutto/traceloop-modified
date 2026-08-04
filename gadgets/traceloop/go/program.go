@@ -65,7 +65,16 @@ const (
 
 	// the max entries of the syscall_filters map
 	maxSyscallFilters int = 16
+
+	// default size (in linuxPageSize units) of each container's overwritable
+	// perf ring buffer, used if the perf-buffer-pages param is empty or invalid.
+	defaultPerfBufferPages uint32 = 1024
 )
+
+// perfBufferPages holds the per-CPU, per-container ring buffer size (in
+// linuxPageSize units), set once in gadgetStart() from the perf-buffer-pages
+// param and read later by attach() for every container that gets traced.
+var perfBufferPages = defaultPerfBufferPages
 
 // TODO Find all syscalls which take a char * as argument and add them there.
 var syscallDefs = map[string][6]uint64{
@@ -225,7 +234,7 @@ func (t *tracelooper) attach(mntnsID uint64) error {
 	}
 
 	// 2. Use this inner Map to create the perf reader.
-	perfReader, err := api.NewPerfReader(innerBuffer, 1024*linuxPageSize, true)
+	perfReader, err := api.NewPerfReader(innerBuffer, perfBufferPages*linuxPageSize, true)
 	if err != nil {
 		innerBuffer.Close()
 
@@ -817,6 +826,22 @@ func gadgetStart() int32 {
 	if err != nil {
 		api.Errorf("failed to get param: %v", err)
 		return 1
+	}
+
+	rawBufferPages, err := api.GetParamValue("perf-buffer-pages", 32)
+	if err != nil {
+		api.Errorf("failed to get param: %v", err)
+		return 1
+	}
+
+	perfBufferPages = defaultPerfBufferPages
+	if rawBufferPages != "" {
+		pages, err := strconv.ParseUint(rawBufferPages, 10, 32)
+		if err != nil || pages == 0 {
+			api.Errorf("invalid perf-buffer-pages %q: must be a positive integer", rawBufferPages)
+			return 1
+		}
+		perfBufferPages = uint32(pages)
 	}
 
 	syscallsFilterMapName := "syscall_filters"
