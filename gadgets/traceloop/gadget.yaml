@@ -36,6 +36,10 @@ datasources:
           description: Syscall's return value
           columns.width: 10
           columns.alignment: right
+      timestamp_boot_ns:
+        annotations:
+          description: Boot-clock timestamp of the syscall (bpf_ktime_get_boot_ns)
+          columns.hidden: true
 params:
   wasm:
     syscall-filters:

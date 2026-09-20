@@ -107,6 +107,11 @@ var syscallDefs = map[string][6]uint64{
 var sysDeclarationCache map[string]api.SyscallDeclaration
 
 type eventFields struct {
+	// Boot-clock timestamp of the syscall, already carried on every event and used
+	// to order them (see timestampFromEvent and the sort in gadgetStop); upstream
+	// simply never surfaces it. Charter v4 6.1 needs it per event to recover
+	// invocation boundaries.
+	timestamp  api.Field
 	mntnsID    api.Field
 	cpu        api.Field
 	pid        api.Field
@@ -801,6 +806,15 @@ func gadgetInit() int32 {
 			kind:  api.Kind_String,
 			field: &fields.ret,
 		},
+		{
+			// Not named "timestamp": Inspektor Gadget renders a field tagged
+			// type:gadget_timestamp as a formatted wall-clock string. This has to
+			// stay a raw uint64 of bpf_ktime_get_boot_ns(), comparable to a
+			// userspace CLOCK_BOOTTIME read with no conversion.
+			name:  "timestamp_boot_ns",
+			kind:  api.Kind_Uint64,
+			field: &fields.timestamp,
+		},
 	}
 	for _, fieldInfo := range fieldsInfo {
 		name := fieldInfo.name
@@ -1016,6 +1030,7 @@ func gadgetStop() int32 {
 			fields.syscall.SetString(api.Data(packet), event.syscall)
 			fields.parameters.SetString(api.Data(packet), paramsToString(event.parameters))
 			fields.ret.SetString(api.Data(packet), event.retval)
+			fields.timestamp.SetUint64(api.Data(packet), uint64(event.timestamp))
 
 			dsOutput.EmitAndRelease(api.Packet(packet))
 		}
