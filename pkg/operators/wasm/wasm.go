@@ -375,6 +375,9 @@ func (i *wasmOperatorInstance) Start(gadgetCtx operators.GadgetContext) error {
 	return i.callGuestFunction(i.ctx, "gadgetStart")
 }
 
+// How long gadgetStop may run; see the comment in Stop.
+const gadgetStopTimeout = 15 * time.Minute
+
 func (i *wasmOperatorInstance) Stop(gadgetCtx operators.GadgetContext) error {
 	i.cancel()
 	defer func() {
@@ -387,8 +390,18 @@ func (i *wasmOperatorInstance) Stop(gadgetCtx operators.GadgetContext) error {
 		i.createdMapMutex.Unlock()
 	}()
 
-	// We need a new context in here, as gadgetCtx has already been cancelled
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*120)
+	// We need a new context in here, as gadgetCtx has already been cancelled.
+	//
+	// traceloop is dump-at-end: gadgetStop reads every per-CPU ring, sorts the
+	// events by timestamp and emits them all. Upstream's 120 s is sized for a
+	// gadget with nothing left to do at stop. Here it cut a 349k-event dump at run
+	// 284 of 300 (support-bundle-collector, data/20260929_r3a_rerun, 2026-10-28:
+	// "calling gadgetStop: module closed with context deadline exceeded"), and
+	// because the dump is time-ordered it was the tail of the stream that vanished.
+	// Measured throughput was ~3k events/s, so the ~700k events an 8192-page ring
+	// holds need ~4 min; 15 min leaves margin for a loaded node and stays within
+	// the campaign watchdog's grace (campaign_watchdog.sh GRACE_S).
+	ctx, cancel := context.WithTimeout(context.Background(), gadgetStopTimeout)
 	defer cancel()
 
 	return i.callGuestFunction(ctx, "gadgetStop")
